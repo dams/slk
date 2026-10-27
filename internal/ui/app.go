@@ -3472,6 +3472,12 @@ func (a *App) SetSidebarStaleThreshold(d time.Duration) {
 	a.sidebar.SetStaleThreshold(d)
 }
 
+// SetSidebarDMPane draws the Direct Messages section in its own box at the
+// bottom of the sidebar ([sidebar] dm_pane).
+func (a *App) SetSidebarDMPane(enabled bool) {
+	a.sidebar.SetDMPane(enabled)
+}
+
 // renderTypingLine returns the styled typing indicator for the current
 // channel (people typing, apps working), or an empty string if there is
 // neither. Stays on App because it pulls in messagepane name resolution
