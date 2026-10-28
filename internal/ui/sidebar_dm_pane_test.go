@@ -55,6 +55,35 @@ func TestSidebarDMPane_TwoBoxesFillTheColumn(t *testing.T) {
 	}
 }
 
+// TestSidebarDMPane_FocusCycle: Tab and Shift+Tab stop at the Direct
+// Messages box, between the channel box and the messages pane.
+func TestSidebarDMPane_FocusCycle(t *testing.T) {
+	a := dmPaneApp()
+	_ = a.View()
+	type stop struct {
+		panel Panel
+		inDMs bool
+	}
+	at := func() stop { return stop{a.focusedPanel, a.sidebar.CursorInDMPane()} }
+	if got := at(); got != (stop{PanelSidebar, false}) {
+		t.Fatalf("start = %+v, want the channel box", got)
+	}
+	for i, want := range []stop{{PanelSidebar, true}, {PanelMessages, true}, {PanelSidebar, false}} {
+		a.FocusNext()
+		_ = a.View()
+		if got := at(); got.panel != want.panel || (want.panel == PanelSidebar && got.inDMs != want.inDMs) {
+			t.Errorf("Tab #%d: %+v, want %+v", i+1, got, want)
+		}
+	}
+	for i, want := range []stop{{PanelMessages, false}, {PanelSidebar, true}, {PanelSidebar, false}} {
+		a.FocusPrev()
+		_ = a.View()
+		if got := at(); got.panel != want.panel || (want.panel == PanelSidebar && got.inDMs != want.inDMs) {
+			t.Errorf("Shift+Tab #%d: %+v, want %+v", i+1, got, want)
+		}
+	}
+}
+
 func TestSidebarDMPane_ClickOpensDM(t *testing.T) {
 	a := dmPaneApp()
 	_ = a.View()

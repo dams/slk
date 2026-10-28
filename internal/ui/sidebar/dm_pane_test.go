@@ -59,24 +59,66 @@ func TestDMPane_SplitsDirectMessagesIntoTheirOwnBox(t *testing.T) {
 	}
 }
 
-// TestDMPane_NavigationReachesDMsLast: the DM section is the last nav
-// stop, so j/k and G follow what is on screen.
-func TestDMPane_NavigationReachesDMsLast(t *testing.T) {
+// TestDMPane_MovementStaysInItsBox: with the split drawn, j/k and gg/G
+// move within the box holding the cursor; FocusDMPane / FocusChannelPane
+// switch boxes.
+func TestDMPane_MovementStaysInItsBox(t *testing.T) {
 	m := dmPaneModel(2)
 	m.SetDMPane(true)
 	m.ViewSplit(12, 3, 30)
+
 	m.GoToBottom()
-	if it, ok := m.SelectedItem(); !ok || it.ID != "D2" {
-		t.Fatalf("last nav stop = %+v, want dm2", it)
+	if it, ok := m.SelectedItem(); !ok || it.ID != "C1" {
+		t.Fatalf("G in the channel box selected %+v, want general (C1), its last row", it)
+	}
+	m.MoveDown()
+	if it, _ := m.SelectedItem(); it.ID != "C1" {
+		t.Errorf("j past the channel box's last row moved to %+v", it)
+	}
+
+	if !m.FocusDMPane() {
+		t.Fatal("FocusDMPane reported no DM box")
 	}
 	m.ViewSplit(12, 3, 30)
-	if !m.CursorInDMPane() {
-		t.Error("cursor on dm2 is not reported in the DM box")
+	if it, ok := m.SelectedItem(); !ok || it.ID != "D1" || !m.CursorInDMPane() {
+		t.Fatalf("FocusDMPane selected %+v (in DM box: %v), want dm1", it, m.CursorInDMPane())
 	}
-	m.GoToTop()
+	m.MoveUp() // the DM header
+	m.MoveUp()
+	if m.cursor != m.dmNavStart {
+		t.Errorf("k above the DM header left the DM box (cursor %d, DM header %d)", m.cursor, m.dmNavStart)
+	}
+	m.GoToBottom()
+	if it, _ := m.SelectedItem(); it.ID != "D2" {
+		t.Errorf("G in the DM box selected %+v, want dm2", it)
+	}
+}
+
+// TestDMPane_FocusRemembersEachBox: switching boxes returns to the row
+// each box held last.
+func TestDMPane_FocusRemembersEachBox(t *testing.T) {
+	m := dmPaneModel(2)
+	m.SetDMPane(true)
 	m.ViewSplit(12, 3, 30)
-	if m.CursorInDMPane() {
-		t.Error("cursor on Threads is reported in the DM box")
+	m.GoToBottom() // general
+	m.FocusDMPane()
+	m.MoveDown() // dm2
+	m.FocusChannelPane()
+	if it, _ := m.SelectedItem(); it.ID != "C1" {
+		t.Errorf("FocusChannelPane returned to %+v, want general", it)
+	}
+	m.FocusDMPane()
+	if it, _ := m.SelectedItem(); it.ID != "D2" {
+		t.Errorf("FocusDMPane returned to %+v, want dm2", it)
+	}
+}
+
+func TestDMPane_FocusNeedsTheSplitDrawn(t *testing.T) {
+	m := dmPaneModel(2)
+	m.SetDMPane(true)
+	m.View(30, 30)
+	if m.FocusDMPane() {
+		t.Error("FocusDMPane moved into a DM box that was not drawn")
 	}
 }
 
@@ -101,6 +143,7 @@ func TestDMPane_ScrollsOnItsOwn(t *testing.T) {
 	m.SetDMPane(true)
 	m.ViewSplit(4, 3, 30)
 
+	m.FocusDMPane()
 	m.GoToBottom()
 	_, dms := m.ViewSplit(4, 3, 30)
 	if !strings.Contains(ansi.Strip(dms), "dm6") {

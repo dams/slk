@@ -330,6 +330,13 @@ type Model struct {
 	lastDMHeight int
 	// split records that the last render was ViewSplit, not View.
 	split bool
+	// dmNavStart is the nav index of the DM section header (-1 if none).
+	// With the split drawn, cursor movement stays within the box holding
+	// the cursor, and each box remembers its selection (mainKey, dmKey)
+	// across FocusDMPane / FocusChannelPane.
+	dmNavStart        int
+	mainKey, dmKey    cursorKey
+	hasMain, hasDMKey bool
 
 	// version increments on every state change that could alter the rendered
 	// View() output. The App layer caches the WRAPPED panel output (border +
@@ -986,17 +993,74 @@ func (m *Model) SelectedItem() (ChannelItem, bool) {
 }
 
 func (m *Model) MoveDown() {
-	if m.cursor+1 < len(m.nav) {
+	if _, hi := m.navBounds(); m.cursor < hi {
 		m.cursor++
 		m.dirty()
 	}
 }
 
 func (m *Model) MoveUp() {
-	if m.cursor > 0 {
+	if lo, _ := m.navBounds(); m.cursor > lo {
 		m.cursor--
 		m.dirty()
 	}
+}
+
+// navBounds is the nav range the cursor moves in: the box holding it when
+// the DM split is drawn, otherwise all of nav.
+func (m *Model) navBounds() (lo, hi int) {
+	hi = len(m.nav) - 1
+	if !m.SplitActive() || m.dmNavStart < 0 {
+		return 0, hi
+	}
+	if m.cursor >= m.dmNavStart {
+		return m.dmNavStart, hi
+	}
+	return 0, m.dmNavStart - 1
+}
+
+// SplitActive reports whether the last render drew the DM box apart.
+func (m *Model) SplitActive() bool {
+	return m.dmPane && m.split && m.dmStart >= 0
+}
+
+// FocusDMPane moves the cursor into the DM box, back onto the DM it last
+// held, or onto the first DM. Reports false when no DM box is drawn.
+func (m *Model) FocusDMPane() bool {
+	if !m.SplitActive() || m.dmNavStart < 0 {
+		return false
+	}
+	if m.cursor >= m.dmNavStart {
+		return true
+	}
+	m.mainKey, m.hasMain = m.currentCursorKey()
+	target := min(m.dmNavStart+1, len(m.nav)-1)
+	if m.hasDMKey {
+		if i := m.navIndexForKey(m.dmKey); i >= m.dmNavStart {
+			target = i
+		}
+	}
+	m.cursor = target
+	m.dirty()
+	return true
+}
+
+// FocusChannelPane is FocusDMPane's mirror: back to the row the channel
+// box last held, or the Threads row.
+func (m *Model) FocusChannelPane() bool {
+	if !m.SplitActive() || m.dmNavStart < 0 || m.cursor < m.dmNavStart {
+		return false
+	}
+	m.dmKey, m.hasDMKey = m.currentCursorKey()
+	target := 0
+	if m.hasMain {
+		if i := m.navIndexForKey(m.mainKey); i >= 0 && i < m.dmNavStart {
+			target = i
+		}
+	}
+	m.cursor = target
+	m.dirty()
+	return true
 }
 
 // ScrollUp moves the viewport up by n rows without changing the selection.
@@ -1162,14 +1226,14 @@ func (m *Model) nearestNavigable(line, dir, lo, hi int) int {
 }
 
 func (m *Model) GoToTop() {
-	if m.cursor != 0 && len(m.nav) > 0 {
-		m.cursor = 0
+	if lo, _ := m.navBounds(); m.cursor != lo && len(m.nav) > 0 {
+		m.cursor = lo
 		m.dirty()
 	}
 }
 
 func (m *Model) GoToBottom() {
-	if last := len(m.nav) - 1; last >= 0 && m.cursor != last {
+	if _, last := m.navBounds(); last >= 0 && m.cursor != last {
 		m.cursor = last
 		m.dirty()
 	}
@@ -1492,7 +1556,15 @@ func (m *Model) rebuildNav() {
 	nav := make([]navItem, 0, 2+len(sectionOrder))
 	nav = append(nav, navItem{kind: navThreads})
 	nav = append(nav, navItem{kind: navActivity})
+	m.dmNavStart = -1
+	dmKey := ""
+	if m.dmPane {
+		dmKey = m.dmSectionKey()
+	}
 	for _, name := range sectionOrder {
+		if dmKey != "" && name == dmKey {
+			m.dmNavStart = len(nav)
+		}
 		nav = append(nav, navItem{kind: navHeader, header: name})
 		if m.IsCollapsed(name) {
 			continue
@@ -1525,27 +1597,28 @@ func (m *Model) rebuildNavWithCursor(key cursorKey, hadKey bool) {
 	if !hadKey {
 		return
 	}
+	// Previous target gone (e.g. the channel was filtered out, or its
+	// section now collapsed): fall back to the Threads row.
+	m.cursor = max(m.navIndexForKey(key), 0)
+}
+
+// navIndexForKey returns the nav index of the target key names, or -1.
+func (m *Model) navIndexForKey(key cursorKey) int {
 	for i, n := range m.nav {
 		switch {
 		case key.kind == navThreads && n.kind == navThreads:
-			m.cursor = i
-			return
+			return i
 		case key.kind == navActivity && n.kind == navActivity:
-			m.cursor = i
-			return
+			return i
 		case key.kind == navHeader && n.kind == navHeader && n.header == key.header:
-			m.cursor = i
-			return
+			return i
 		case key.kind == navChannel && n.kind == navChannel:
 			if n.fi >= 0 && n.fi < len(m.filtered) && m.items[m.filtered[n.fi]].ID == key.id {
-				m.cursor = i
-				return
+				return i
 			}
 		}
 	}
-	// Previous target gone (e.g. the channel was filtered out, or its
-	// section now collapsed). Fall back to the Threads row.
-	m.cursor = 0
+	return -1
 }
 
 // aggregateForSection returns the two figures a collapsed section
