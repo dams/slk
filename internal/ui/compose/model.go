@@ -1099,23 +1099,21 @@ func (m *Model) CloseMention() {
 	m.mentionPicker.Close()
 }
 
-// TranslateMentionsForSend replaces @DisplayName with <@UserID> and
-// #channel-name with <#CHANNELID> in the text. Both kinds of mention
-// share one translation pass because they share the same word-boundary
-// and longest-first sorting concerns -- e.g., a longer channel name
-// must be tried before a shorter one with the same prefix, and a user
-// named "here" (if such a thing existed) must not match inside @heretic.
-func (m Model) TranslateMentionsForSend(text string) string {
-	// trigger is the leading character ('@' for users/specials, '#' for
-	// channels); name is what follows; replacement is the wire form.
-	// rank breaks ties when two kinds of mention share a name (a user
-	// and a usergroup can both be "@design") -- lower wins.
-	type entry struct {
-		trigger     byte
-		name        string
-		replacement string
-		rank        int
-	}
+// sendMention is one name TranslateMentionsForSend rewrites: trigger
+// is the leading character ('@' for users/specials, '#' for channels);
+// name is what follows; replacement is the wire form. rank breaks ties
+// when two kinds of mention share a name (a user and a usergroup can
+// both be "@design") -- lower wins.
+type sendMention struct {
+	trigger     byte
+	name        string
+	replacement string
+	rank        int
+}
+
+// sendMentions returns every mention the box translates, in the order
+// TranslateMentionsForSend tries them.
+func (m Model) sendMentions() []sendMention {
 	const (
 		rankSpecial = iota
 		rankUser
@@ -1123,18 +1121,18 @@ func (m Model) TranslateMentionsForSend(text string) string {
 		rankChannel
 	)
 
-	var entries []entry
+	var entries []sendMention
 
 	// Special @ mentions
 	entries = append(entries,
-		entry{'@', "here", "<!here>", rankSpecial},
-		entry{'@', "channel", "<!channel>", rankSpecial},
-		entry{'@', "everyone", "<!everyone>", rankSpecial},
+		sendMention{'@', "here", "<!here>", rankSpecial},
+		sendMention{'@', "channel", "<!channel>", rankSpecial},
+		sendMention{'@', "everyone", "<!everyone>", rankSpecial},
 	)
 
 	// User mentions
 	for name, userID := range m.reverseNames {
-		entries = append(entries, entry{'@', name, "<@" + userID + ">", rankUser})
+		entries = append(entries, sendMention{'@', name, "<@" + userID + ">", rankUser})
 	}
 
 	// Usergroup mentions. Like channels below, we emit the labeled
@@ -1142,7 +1140,7 @@ func (m Model) TranslateMentionsForSend(text string) string {
 	// echo renders the handle even if the server echo arrives before
 	// usergroups.list refreshes this workspace's map.
 	for id, handle := range m.userGroups {
-		entries = append(entries, entry{'@', handle, "<!subteam^" + id + "|@" + handle + ">", rankUserGroup})
+		entries = append(entries, sendMention{'@', handle, "<!subteam^" + id + "|@" + handle + ">", rankUserGroup})
 	}
 
 	// Channel mentions. We emit <#CHANNELID|name> rather than the
@@ -1153,23 +1151,23 @@ func (m Model) TranslateMentionsForSend(text string) string {
 	// Slack accepts both forms on the wire and normalizes echoes
 	// to the |name form anyway.
 	for name, channelID := range m.reverseChannels {
-		entries = append(entries, entry{'#', name, "<#" + channelID + "|" + name + ">", rankChannel})
+		entries = append(entries, sendMention{'#', name, "<#" + channelID + "|" + name + ">", rankChannel})
 	}
 
 	// Sort by name length descending. This lives across both trigger
 	// kinds because the substring-corruption concern is per-trigger:
-	// the loop below builds the search needle as trigger+name, so a
-	// longer @name still won't collide with a shorter #name even when
-	// they share the same suffix.
+	// the loop in TranslateMentionsForSend builds the search needle as
+	// trigger+name, so a longer @name still won't collide with a
+	// shorter #name even when they share the same suffix.
 	//
 	// sort.Slice is unstable and the entries above come out of map
 	// iteration, so equal-length names need an explicit tie-break or
 	// the same text translates to different wire forms run to run.
-	// Earlier entries win: the loop below rewrites every occurrence, so
-	// by the time a later entry with the same name is tried, the text
-	// no longer contains it. Precedence is rank (a name shared by a
-	// person and a usergroup resolves to the person), then name, then
-	// replacement to settle same-rank duplicates.
+	// Earlier entries win: TranslateMentionsForSend rewrites every
+	// occurrence, so by the time a later entry with the same name is
+	// tried, the text no longer contains it. Precedence is rank (a name
+	// shared by a person and a usergroup resolves to the person), then
+	// name, then replacement to settle same-rank duplicates.
 	sort.Slice(entries, func(i, j int) bool {
 		a, b := entries[i], entries[j]
 		if len(a.name) != len(b.name) {
@@ -1183,8 +1181,27 @@ func (m Model) TranslateMentionsForSend(text string) string {
 		}
 		return a.replacement < b.replacement
 	})
+	return entries
+}
 
-	for _, e := range entries {
+// endsMention reports whether a mention ending at end stops at a word
+// boundary, so #general doesn't match inside #general-help, etc.
+func endsMention(text string, end int) bool {
+	if end >= len(text) {
+		return true
+	}
+	next := text[end]
+	return next == ' ' || next == '\n' || next == '\t' || next == ',' || next == '.' || next == '!' || next == '?' || next == ':' || next == ';' || next == ')' || next == '>'
+}
+
+// TranslateMentionsForSend replaces @DisplayName with <@UserID> and
+// #channel-name with <#CHANNELID> in the text. Both kinds of mention
+// share one translation pass because they share the same word-boundary
+// and longest-first sorting concerns -- e.g., a longer channel name
+// must be tried before a shorter one with the same prefix, and a user
+// named "here" (if such a thing existed) must not match inside @heretic.
+func (m Model) TranslateMentionsForSend(text string) string {
+	for _, e := range m.sendMentions() {
 		mention := string(e.trigger) + e.name
 		searchFrom := 0
 		for {
@@ -1194,14 +1211,9 @@ func (m Model) TranslateMentionsForSend(text string) string {
 			}
 			idx := searchFrom + rel
 			end := idx + len(mention)
-			// Require a word boundary after the mention so #general
-			// doesn't match inside #general-help, etc.
-			if end < len(text) {
-				next := text[end]
-				if next != ' ' && next != '\n' && next != '\t' && next != ',' && next != '.' && next != '!' && next != '?' && next != ':' && next != ';' && next != ')' && next != '>' {
-					searchFrom = end
-					continue
-				}
+			if !endsMention(text, end) {
+				searchFrom = end
+				continue
 			}
 			text = text[:idx] + e.replacement + text[end:]
 			searchFrom = idx + len(e.replacement)
@@ -1224,9 +1236,23 @@ var wireMentionRe = regexp.MustCompile(`<@([A-Z0-9]+)(?:\|[^>]*)?>|<#([A-Z0-9]+)
 // mention wins, or a name glued to the text after it stays in wire
 // form, which Slack still accepts.
 func (m Model) MentionsForEdit(text string) string {
+	locs := wireMentionRe.FindAllStringSubmatchIndex(text, -1)
+	if len(locs) == 0 {
+		return text
+	}
+	entries := m.sendMentions()
+	userNames := make(map[string]string, len(m.reverseNames))
+	for name, id := range m.reverseNames {
+		userNames[id] = name
+	}
+	channelNames := make(map[string]string, len(m.reverseChannels))
+	for name, id := range m.reverseChannels {
+		channelNames[id] = name
+	}
+
 	var b strings.Builder
 	last := 0
-	for _, loc := range wireMentionRe.FindAllStringSubmatchIndex(text, -1) {
+	for _, loc := range locs {
 		group := func(i int) string {
 			if loc[2*i] < 0 {
 				return ""
@@ -1236,23 +1262,13 @@ func (m Model) MentionsForEdit(text string) string {
 		var typed, want string
 		switch {
 		case group(1) != "":
-			id := group(1)
-			for name, uid := range m.reverseNames {
-				if uid == id {
-					typed, want = "@"+name, "<@"+id+">"
-					break
-				}
+			if name := userNames[group(1)]; name != "" {
+				typed, want = "@"+name, "<@"+group(1)+">"
 			}
 		case group(2) != "":
 			id, name := group(2), group(3)
 			if m.reverseChannels[name] != id {
-				name = ""
-				for n, cid := range m.reverseChannels {
-					if cid == id {
-						name = n
-						break
-					}
-				}
+				name = channelNames[id]
 			}
 			if name != "" {
 				typed, want = "#"+name, "<#"+id+"|"+name+">"
@@ -1264,8 +1280,7 @@ func (m Model) MentionsForEdit(text string) string {
 				typed, want = "@"+handle, "<!subteam^"+group(5)+"|@"+handle+">"
 			}
 		}
-		rest := text[loc[1]:]
-		if typed == "" || !strings.HasPrefix(m.TranslateMentionsForSend(typed+rest), want) {
+		if typed == "" || !translatesTo(entries, typed+text[loc[1]:], want) {
 			continue
 		}
 		b.WriteString(text[last:loc[0]])
@@ -1274,6 +1289,20 @@ func (m Model) MentionsForEdit(text string) string {
 	}
 	b.WriteString(text[last:])
 	return b.String()
+}
+
+// translatesTo reports whether TranslateMentionsForSend, given the
+// entries from sendMentions, rewrites the mention at the start of s as
+// want: the first entry whose needle starts s at a word boundary is the
+// one it applies there.
+func translatesTo(entries []sendMention, s, want string) bool {
+	for _, e := range entries {
+		needle := string(e.trigger) + e.name
+		if strings.HasPrefix(s, needle) && endsMention(s, len(needle)) {
+			return e.replacement == want
+		}
+	}
+	return false
 }
 
 // MentionPickerView returns the rendered mention picker dropdown, or "" if not active.
