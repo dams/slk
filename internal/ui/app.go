@@ -3936,11 +3936,11 @@ func (a *App) beginEditOfSelected() tea.Cmd {
 	switch panel {
 	case PanelMessages:
 		stashed = a.compose.Value()
-		a.compose.SetValue(text)
+		a.compose.SetValue(a.compose.MentionsForEdit(text))
 		a.compose.SetPlaceholderOverride("Editing message — Enter to save, Esc to cancel")
 	case PanelThread:
 		stashed = a.threadCompose.Value()
-		a.threadCompose.SetValue(text)
+		a.threadCompose.SetValue(a.threadCompose.MentionsForEdit(text))
 		a.threadCompose.SetPlaceholderOverride("Editing message — Enter to save, Esc to cancel")
 	}
 

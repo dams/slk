@@ -4,6 +4,7 @@ package compose
 import (
 	"fmt"
 	"image/color"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -1208,6 +1209,71 @@ func (m Model) TranslateMentionsForSend(text string) string {
 	}
 
 	return text
+}
+
+// wireMentionRe matches the mention tokens TranslateMentionsForSend
+// emits, plus the unlabeled forms other clients send: <@UID>,
+// <#CID|name> / <#CID>, <!here> and friends, <!subteam^SID|@handle>.
+var wireMentionRe = regexp.MustCompile(`<@([A-Z0-9]+)(?:\|[^>]*)?>|<#([A-Z0-9]+)(?:\|([^>]*))?>|<!(here|channel|everyone)(?:\|[^>]*)?>|<!subteam\^([A-Z0-9]+)(?:\|[^>]*)?>`)
+
+// MentionsForEdit is the inverse of TranslateMentionsForSend, for
+// seeding the box with a sent message's text: it rewrites each mention
+// token as the "@name" / "#name" a person would type. A token is only
+// rewritten when TranslateMentionsForSend turns the rewritten text back
+// into the same mention; an ID the box doesn't know, a name another
+// mention wins, or a name glued to the text after it stays in wire
+// form, which Slack still accepts.
+func (m Model) MentionsForEdit(text string) string {
+	var b strings.Builder
+	last := 0
+	for _, loc := range wireMentionRe.FindAllStringSubmatchIndex(text, -1) {
+		group := func(i int) string {
+			if loc[2*i] < 0 {
+				return ""
+			}
+			return text[loc[2*i]:loc[2*i+1]]
+		}
+		var typed, want string
+		switch {
+		case group(1) != "":
+			id := group(1)
+			for name, uid := range m.reverseNames {
+				if uid == id {
+					typed, want = "@"+name, "<@"+id+">"
+					break
+				}
+			}
+		case group(2) != "":
+			id, name := group(2), group(3)
+			if m.reverseChannels[name] != id {
+				name = ""
+				for n, cid := range m.reverseChannels {
+					if cid == id {
+						name = n
+						break
+					}
+				}
+			}
+			if name != "" {
+				typed, want = "#"+name, "<#"+id+"|"+name+">"
+			}
+		case group(4) != "":
+			typed, want = "@"+group(4), "<!"+group(4)+">"
+		case group(5) != "":
+			if handle := m.userGroups[group(5)]; handle != "" {
+				typed, want = "@"+handle, "<!subteam^"+group(5)+"|@"+handle+">"
+			}
+		}
+		rest := text[loc[1]:]
+		if typed == "" || !strings.HasPrefix(m.TranslateMentionsForSend(typed+rest), want) {
+			continue
+		}
+		b.WriteString(text[last:loc[0]])
+		b.WriteString(typed)
+		last = loc[1]
+	}
+	b.WriteString(text[last:])
+	return b.String()
 }
 
 // MentionPickerView returns the rendered mention picker dropdown, or "" if not active.
