@@ -1674,13 +1674,12 @@ func TestBeginEditOfSelected_Own_EntersEditMode(t *testing.T) {
 // The message text carries Slack's <#CID> form; the box shows the
 // #name a person types, which TranslateMentionsForSend turns back.
 func TestBeginEditOfSelected_ShowsChannelMentionByName(t *testing.T) {
-	app := NewApp()
-	app.activeChannelID = "C1"
+	app := newTestApp(t,
+		withActiveChannel("C1"),
+		withChannels(sidebar.ChannelItem{ID: "CUJL4QPU0", Name: "general", Type: "channel"}),
+		withMessages(messages.MessageItem{TS: "1.0", UserID: "U_ME", Text: "see <#CUJL4QPU0>"}),
+	)
 	app.SetCurrentUserID("U_ME")
-	app.SetChannels([]sidebar.ChannelItem{{ID: "CUJL4QPU0", Name: "general", Type: "channel"}})
-	app.messagepane.SetMessages([]messages.MessageItem{
-		{TS: "1.0", UserID: "U_ME", Text: "see <#CUJL4QPU0>"},
-	})
 	app.focusedPanel = PanelMessages
 
 	app.beginEditOfSelected()
