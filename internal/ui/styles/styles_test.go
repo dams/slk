@@ -236,6 +236,31 @@ func TestUsernameColoredToggle(t *testing.T) {
 	}
 }
 
+func TestApply_UsernameAndSidebarSelectedFromTheme(t *testing.T) {
+	RegisterCustomTheme("slacklike", ThemeColors{
+		Primary: "#1264A3", Accent: "#007A5A", Warning: "#ECB22E",
+		Error: "#C01343", Background: "#FFFFFF", Surface: "#F8F8F8",
+		SurfaceDark: "#F2F2F2", Text: "#1D1C1D", TextMuted: "#616061",
+		Border: "#DDDDDD", SidebarText: "#1D1C1D",
+		Username: "#1D1C1D", SidebarSelectedBg: "#333133",
+	})
+	Apply("slacklike", config.Theme{})
+	if !colorEqual(Username("U123", false).GetForeground(), lipgloss.Color("#1D1C1D")) {
+		t.Fatal("username role not applied")
+	}
+	if !colorEqual(SidebarSelectedBg, lipgloss.Color("#333133")) {
+		t.Fatal("sidebar_selected_bg not applied")
+	}
+	if !colorEqual(SidebarSelectedFg, SidebarText) {
+		t.Fatal("sidebar_selected_fg must default to SidebarText")
+	}
+
+	Apply("dark", config.Theme{})
+	if SidebarSelectedBg != nil || !colorEqual(UsernameColor, Primary) {
+		t.Fatal("username / sidebar_selected_bg leaked into a theme without them")
+	}
+}
+
 // The mention badge uses the theme's highlight pair rather than a
 // hardcoded color, so it stays legible on every theme. Apply() derives
 // Primary-on-Background when a theme omits the pair, so the style is

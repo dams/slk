@@ -42,6 +42,12 @@ type ThemeColors struct {
 	ComposeInsertBG      string `toml:"compose_insert_bg"`
 	SelectionBgFocused   string `toml:"selection_bg_focused"`
 	SelectionBgUnfocused string `toml:"selection_bg_unfocused"`
+	// Username colors author names when colored_usernames is off
+	// (default Primary). SidebarSelectedBg/Fg paint the sidebar cursor
+	// row as a filled pill instead of the "▌" marker.
+	Username          string `toml:"username"`
+	SidebarSelectedBg string `toml:"sidebar_selected_bg"`
+	SidebarSelectedFg string `toml:"sidebar_selected_fg"`
 }
 
 // builtinThemes maps lowercase theme names to their display name and colors.

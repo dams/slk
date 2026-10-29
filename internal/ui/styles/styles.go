@@ -42,6 +42,13 @@ var (
 	SearchHighlightBg color.Color
 	SearchHighlightFg color.Color
 
+	// UsernameColor is Primary unless the theme sets username.
+	UsernameColor color.Color = lipgloss.Color("#4A9EFF")
+	// SidebarSelectedBg is nil unless the theme sets sidebar_selected_bg;
+	// nil keeps the "▌" cursor marker.
+	SidebarSelectedBg color.Color
+	SidebarSelectedFg color.Color
+
 	// Panel styles
 	FocusedBorder = lipgloss.NewStyle().
 			BorderStyle(lipgloss.ThickBorder()).
@@ -370,6 +377,20 @@ func Apply(themeName string, overrides core.Theme) {
 		SelectionForeground = Background
 	}
 
+	if colors.Username != "" {
+		UsernameColor = lipgloss.Color(colors.Username)
+	} else {
+		UsernameColor = Primary
+	}
+	SidebarSelectedBg, SidebarSelectedFg = nil, nil
+	if colors.SidebarSelectedBg != "" {
+		SidebarSelectedBg = lipgloss.Color(colors.SidebarSelectedBg)
+		SidebarSelectedFg = SidebarText
+		if colors.SidebarSelectedFg != "" {
+			SidebarSelectedFg = lipgloss.Color(colors.SidebarSelectedFg)
+		}
+	}
+
 	if colors.SearchHighlightBg != "" {
 		SearchHighlightBg = lipgloss.Color(colors.SearchHighlightBg)
 	} else {
@@ -432,10 +453,10 @@ func UserColor(userID string) color.Color {
 
 // Username returns a lipgloss style for rendering a username. When colored
 // is true and userID is non-empty, the foreground color is deterministically
-// derived from userID via UserColor. Otherwise the theme default (Primary)
-// is used.
+// derived from userID via UserColor. Otherwise the theme's UsernameColor
+// (Primary unless the theme sets username) is used.
 func Username(userID string, colored bool) lipgloss.Style {
-	fg := Primary
+	fg := UsernameColor
 	if colored && userID != "" {
 		fg = UserColor(userID)
 	}
