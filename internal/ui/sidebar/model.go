@@ -480,7 +480,12 @@ func (m *Model) NextUnread(afterID string, dir int) (id, name, chType string, ok
 
 // Invalidate forces the next View() call to re-read read state from
 // the installed reader. Called by App.Update on ReadStateChangedMsg.
+// With active_only on it also refilters, so a dormant channel that gets
+// a new message comes back.
 func (m *Model) Invalidate() {
+	if m.activeOnly {
+		m.refilter()
+	}
 	m.cacheValid = false
 	m.dirty()
 }
@@ -1935,7 +1940,6 @@ func (m *Model) buildCache(width int) {
 		default:
 			prefix = "# "
 		}
-		prefix = strings.Repeat(" ", m.channelIndent) + prefix
 
 		// Truncate name to fit sidebar width.
 		// Unicode chars like ● (U+25CF), ○, ◆, ▌ have East Asian Width
@@ -1960,10 +1964,13 @@ func (m *Model) buildCache(width int) {
 		if statusGlyph != "" {
 			statusCells = 1 + item.Status.GlyphWidth(statusNow)
 		}
-		maxNameLen := (width - 2) - rowChromeExcludingTrailer - trailerCells - statusCells - m.channelIndent
-		if maxNameLen < 5 {
-			maxNameLen = 5
-		}
+		// The indent and a prefix wider than its 3 cells (a custom
+		// private_glyph) come out of the name's budget, and the indent
+		// shrinks first so the 5-cell floor never overflows the row.
+		budget := (width - 2) - rowChromeExcludingTrailer - trailerCells - statusCells - max(lipgloss.Width(prefix)-3, 0)
+		indent := min(m.channelIndent, max(budget-5, 0))
+		prefix = strings.Repeat(" ", indent) + prefix
+		maxNameLen := max(budget-indent, 5)
 		if lipgloss.Width(name) > maxNameLen {
 			name = truncate.StringWithTail(name, uint(maxNameLen), "…")
 		}

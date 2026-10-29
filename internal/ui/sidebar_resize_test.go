@@ -8,19 +8,16 @@ import (
 	"github.com/gammons/slk/internal/ui/sidebar"
 )
 
-func newResizeApp(enabled bool) *App {
-	a := NewApp()
-	a.width = 160
-	a.height = 40
-	a.sidebarVisible = true
-	a.sidebar.SetItems([]sidebar.ChannelItem{{ID: "C1", Name: "general", Type: "channel"}})
+func newResizeApp(t *testing.T, enabled bool) *App {
+	t.Helper()
+	a := newTestApp(t, withSize(160, 40),
+		withChannels(sidebar.ChannelItem{ID: "C1", Name: "general", Type: "channel"}), withRender())
 	a.SetSidebarStyle(SidebarStyle{MouseResize: enabled})
-	_ = a.View()
 	return a
 }
 
 func TestSidebarResize_DragMovesTheBorder(t *testing.T) {
-	a := newResizeApp(true)
+	a := newResizeApp(t, true)
 	before := a.sidebar.Width()
 	border := a.layout.SidebarEnd() - 1
 
@@ -41,7 +38,7 @@ func TestSidebarResize_DragMovesTheBorder(t *testing.T) {
 }
 
 func TestSidebarResize_OffByDefault(t *testing.T) {
-	a := newResizeApp(false)
+	a := newResizeApp(t, false)
 	before := a.sidebar.Width()
 	border := a.layout.SidebarEnd() - 1
 

@@ -94,3 +94,25 @@ func TestActiveOnly_HidesInactiveInEverySection(t *testing.T) {
 		}
 	}
 }
+
+// TestActiveOnly_DormantChannelReturnsOnANewMessage: the App calls
+// Invalidate on a read-state change; a hidden channel that turned
+// unread must come back without waiting for the next full rebuild.
+func TestActiveOnly_DormantChannelReturnsOnANewMessage(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	state := map[string]cache.ReadState{
+		"C1": {LastReadTS: fmt.Sprintf("%d.000000", now.Add(-40*24*time.Hour).Unix())},
+	}
+	m := New([]ChannelItem{{ID: "C1", Name: "dormant", Type: "channel", Section: "Must Read"}})
+	m.nowFn = func() time.Time { return now }
+	m.SetReadStateReader(func() map[string]cache.ReadState { return state })
+	m.SetActiveOnly(true)
+	if view := m.View(12, 30); strings.Contains(view, "dormant") {
+		t.Fatalf("dormant channel shown before its new message:\n%s", view)
+	}
+	state["C1"] = cache.ReadState{LastReadTS: state["C1"].LastReadTS, HasUnread: true}
+	m.Invalidate()
+	if view := m.View(12, 30); !strings.Contains(view, "dormant") {
+		t.Errorf("dormant channel still hidden after a new message:\n%s", view)
+	}
+}

@@ -913,29 +913,14 @@ func TestConfig_RightAlignBadges(t *testing.T) {
 }
 
 func TestConfig_ChannelIndent(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte("[sidebar]\nchannel_indent = 3\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cfg := loadConfigString(t, "[sidebar]\nchannel_indent = 3\n")
 	if cfg.Sidebar.ChannelIndent != 3 {
 		t.Errorf("channel_indent = %d, want 3", cfg.Sidebar.ChannelIndent)
 	}
 }
 
 func TestConfig_SidebarSlackOptions(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	body := "[sidebar]\nslack_style = true\nprivate_glyph = \"L\"\nactive_only = true\nmouse_resize = true\n"
-	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cfg := loadConfigString(t, "[sidebar]\nslack_style = true\nprivate_glyph = \"L\"\nactive_only = true\nmouse_resize = true\n")
 	s := cfg.Sidebar
 	if !s.SlackStyle || s.PrivateGlyph != "L" || !s.ActiveOnly || !s.MouseResize {
 		t.Errorf("parsed %+v", s)

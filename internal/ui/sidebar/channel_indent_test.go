@@ -3,6 +3,10 @@ package sidebar
 import (
 	"strings"
 	"testing"
+
+	"charm.land/lipgloss/v2"
+
+	"github.com/gammons/slk/internal/cache"
 )
 
 func TestChannelIndent_ShiftsSectionRowsOnly(t *testing.T) {
@@ -39,5 +43,33 @@ func TestChannelIndent_Clamped(t *testing.T) {
 	m.SetChannelIndent(-2)
 	if m.channelIndent != 0 {
 		t.Errorf("indent = %d, want 0", m.channelIndent)
+	}
+}
+
+// TestChannelIndent_NarrowRowStaysOneRow: at a narrow width the indent
+// gives way before the name's 5-cell floor pushes the badge off the row.
+func TestChannelIndent_NarrowRowStaysOneRow(t *testing.T) {
+	m := New([]ChannelItem{{ID: "C1", Name: "a_rather_long_channel_name", Type: "channel"}})
+	m.SetReadStateReader(func() map[string]cache.ReadState {
+		return map[string]cache.ReadState{"C1": {HasUnread: true, MentionCount: 120}}
+	})
+	m.ToggleCollapse("Channels")
+	m.SetChannelIndent(6)
+	row := ansiRe.ReplaceAllString(rowFor(t, m.View(12, 20), "a_ra"), "")
+	if !strings.Contains(row, "99+") || lipgloss.Width(row) > 20 {
+		t.Errorf("row wrapped or overflowed 20 cells (%d): %q", lipgloss.Width(row), row)
+	}
+}
+
+func TestPrivateGlyph_WideGlyphStaysInTheRow(t *testing.T) {
+	m := New([]ChannelItem{{ID: "G1", Name: "a_rather_long_private_name", Type: "private"}})
+	m.SetReadStateReader(func() map[string]cache.ReadState {
+		return map[string]cache.ReadState{"G1": {HasUnread: true, MentionCount: 120}}
+	})
+	m.ToggleCollapse("Channels")
+	m.SetPrivateGlyph("[priv]")
+	row := ansiRe.ReplaceAllString(rowFor(t, m.View(12, 30), "[priv]"), "")
+	if !strings.Contains(row, "99+") || lipgloss.Width(row) > 30 {
+		t.Errorf("wide private glyph pushed the row past 30 cells (%d): %q", lipgloss.Width(row), row)
 	}
 }
