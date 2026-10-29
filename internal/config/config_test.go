@@ -1047,18 +1047,11 @@ team_id = "T04T4TH8W"
 }
 
 func TestConfig_ReplyAvatars(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
 	for _, tc := range []struct {
 		toml string
 		want bool
 	}{{"", false}, {"[appearance]\nreply_avatars = true\n", true}} {
-		if err := os.WriteFile(path, []byte(tc.toml), 0644); err != nil {
-			t.Fatal(err)
-		}
-		cfg, err := Load(path)
-		if err != nil {
-			t.Fatal(err)
-		}
+		cfg := loadConfigString(t, tc.toml)
 		if cfg.Appearance.ReplyAvatars != tc.want {
 			t.Errorf("%q: reply_avatars = %v, want %v", tc.toml, cfg.Appearance.ReplyAvatars, tc.want)
 		}

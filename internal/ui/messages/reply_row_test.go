@@ -24,6 +24,17 @@ func TestRenderMessage_ReplyRowShowsAvatarsThenCount(t *testing.T) {
 	}
 }
 
+func TestRenderMessage_ReplyRowFitsANarrowPane(t *testing.T) {
+	msg := MessageItem{TS: "1.0", UserID: "U1", UserName: "priya", Text: "ship it",
+		Timestamp: "3:40 PM", ReplyCount: 7, ReplyUsers: []string{"U1", "U3", "U4", "U5", "U6"}}
+	m := New([]MessageItem{msg}, "general")
+	m.SetReplyAvatarFunc(func(id string) string { return "<" + id + ">" })
+	got := sgr.ReplaceAllString(RenderMessage(msg, 24, m.renderContext(), RenderOptions{ReplyAffordance: true}).Content, "")
+	if !strings.Contains(got, "\n<U1> <U3> 7 replies") || strings.Contains(got, "<U4>") {
+		t.Errorf("want only the avatars that fit 20 cells beside the count, got:\n%s", got)
+	}
+}
+
 func TestRenderMessage_ReplyRowDefaultsToBracketedCount(t *testing.T) {
 	msg := MessageItem{TS: "1.0", UserID: "U1", UserName: "priya", Text: "ship it",
 		Timestamp: "3:40 PM", ReplyCount: 2, ReplyUsers: []string{"U1", "U2"}}

@@ -188,8 +188,8 @@ func RenderMessage(msg MessageItem, width int, rc *RenderContext, opt RenderOpti
 			word = "reply"
 		}
 		if rc.ReplyAvatar != nil {
-			threadLine = "\n" + replyAvatars(msg.ReplyUsers, rc.ReplyAvatar) +
-				styles.ThreadIndicator.Italic(false).Bold(true).Render(fmt.Sprintf("%d %s", msg.ReplyCount, word))
+			label := styles.ThreadIndicator.Italic(false).Bold(true).Render(fmt.Sprintf("%d %s", msg.ReplyCount, word))
+			threadLine = "\n" + replyAvatars(msg.ReplyUsers, rc.ReplyAvatar, contentWidth-lipgloss.Width(label)) + label
 		} else {
 			threadLine = "\n" + styles.ThreadIndicator.Render(
 				fmt.Sprintf("[%d %s ->]", msg.ReplyCount, word))
@@ -684,23 +684,31 @@ func RenderMessage(msg MessageItem, width int, rc *RenderContext, opt RenderOpti
 const maxReplyAvatars = 5
 
 // replyAvatars draws up to maxReplyAvatars repliers' small avatars, each
-// followed by a space, as Slack does before "N replies". Repliers whose
-// avatar isn't ready are skipped.
-func replyAvatars(userIDs []string, avatar AvatarFunc) string {
+// followed by a space, as Slack does before "N replies", as many as fit
+// in room cells: the reply row must stay one row. Repliers whose avatar
+// isn't ready are skipped.
+func replyAvatars(userIDs []string, avatar AvatarFunc, room int) string {
 	if avatar == nil {
 		return ""
 	}
 	gap := lipgloss.NewStyle().Background(styles.Background).Render(" ")
 	var b strings.Builder
-	drawn := 0
+	drawn, used := 0, 0
 	for _, id := range userIDs {
 		if drawn == maxReplyAvatars {
 			break
 		}
-		if av := avatar(id); av != "" && !strings.Contains(av, "\n") {
-			b.WriteString(av + gap)
-			drawn++
+		av := avatar(id)
+		if av == "" || strings.Contains(av, "\n") {
+			continue
 		}
+		w := lipgloss.Width(av) + 1
+		if used+w > room {
+			break
+		}
+		b.WriteString(av + gap)
+		used += w
+		drawn++
 	}
 	return b.String()
 }

@@ -216,12 +216,8 @@ func (c *Cache) preloadInner(userID, avatarURL string) {
 		return
 	}
 	rendered := c.renderAvatar(userID, res.Img)
-	small := c.renderSmall(userID)
 	c.mu.Lock()
 	c.renders[userID] = rendered
-	if small != "" {
-		c.small[userID] = small
-	}
 	c.mu.Unlock()
 	if c.onReady != nil {
 		c.onReady(userID)
@@ -254,12 +250,22 @@ func (c *Cache) Get(userID string) string {
 	return c.renders[userID]
 }
 
-// GetSmall returns the reply-row avatar, or empty if not cached or not
-// on kitty (a 2×1 half-block avatar is unreadable).
+// GetSmall returns the reply-row avatar, rendering it on first use, or
+// empty if the avatar is not loaded yet or not on kitty (a 2×1
+// half-block avatar is unreadable).
 func (c *Cache) GetSmall(userID string) string {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.small[userID]
+	small, loaded := c.small[userID], c.renders[userID] != ""
+	c.mu.RUnlock()
+	if small != "" || !loaded {
+		return small
+	}
+	if small = c.renderSmall(userID); small != "" {
+		c.mu.Lock()
+		c.small[userID] = small
+		c.mu.Unlock()
+	}
+	return small
 }
 
 // renderSmall renders the source renderAvatar registered at the reply-row
