@@ -29,6 +29,7 @@ type RenderContext struct {
 	ImageChannel     string              // the key image fetches and ImageReadyMsg use (P3)
 	SearchTerms      []string
 	Nav              ReactionNav // drawn only when RenderOptions.IsSelected
+	ReplyAvatar      AvatarFunc  // Slack-style reply row when non-nil
 }
 
 // RenderOptions are the per-pane differences in how a message renders:
@@ -186,8 +187,13 @@ func RenderMessage(msg MessageItem, width int, rc *RenderContext, opt RenderOpti
 		if msg.ReplyCount == 1 {
 			word = "reply"
 		}
-		threadLine = "\n" + styles.ThreadIndicator.Render(
-			fmt.Sprintf("[%d %s ->]", msg.ReplyCount, word))
+		if rc.ReplyAvatar != nil {
+			threadLine = "\n" + replyAvatars(msg.ReplyUsers, rc.ReplyAvatar) +
+				styles.ThreadIndicator.Italic(false).Bold(true).Render(fmt.Sprintf("%d %s", msg.ReplyCount, word))
+		} else {
+			threadLine = "\n" + styles.ThreadIndicator.Render(
+				fmt.Sprintf("[%d %s ->]", msg.ReplyCount, word))
+		}
 	}
 
 	var reactionLine string
@@ -672,4 +678,29 @@ func RenderMessage(msg MessageItem, width int, rc *RenderContext, opt RenderOpti
 	out.HeaderBudget = min(contentWidth, width-1-(contentColBase-1))
 	out.SixelRows = allSixel
 	return out
+}
+
+// maxReplyAvatars caps the repliers drawn on a reply row.
+const maxReplyAvatars = 5
+
+// replyAvatars draws up to maxReplyAvatars repliers' small avatars, each
+// followed by a space, as Slack does before "N replies". Repliers whose
+// avatar isn't ready are skipped.
+func replyAvatars(userIDs []string, avatar AvatarFunc) string {
+	if avatar == nil {
+		return ""
+	}
+	gap := lipgloss.NewStyle().Background(styles.Background).Render(" ")
+	var b strings.Builder
+	drawn := 0
+	for _, id := range userIDs {
+		if drawn == maxReplyAvatars {
+			break
+		}
+		if av := avatar(id); av != "" && !strings.Contains(av, "\n") {
+			b.WriteString(av + gap)
+			drawn++
+		}
+	}
+	return b.String()
 }
