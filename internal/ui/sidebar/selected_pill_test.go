@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gammons/slk/internal/cache"
 	"github.com/gammons/slk/internal/config"
 	"github.com/gammons/slk/internal/ui/styles"
 )
@@ -53,5 +54,26 @@ func TestSelectedPill_UnthemedKeepsMarker(t *testing.T) {
 	m.SelectByID("C1")
 	if row := rowFor(t, m.View(10, 30), "deploys"); !strings.Contains(row, "▌") {
 		t.Errorf("theme without sidebar_selected_bg lost the ▌ marker:\n%q", row)
+	}
+}
+
+func TestRightAlignBadges_BadgeEndsTheRow(t *testing.T) {
+	m := New([]ChannelItem{
+		{ID: "C1", Name: "deploys", Type: "channel"},
+		{ID: "C2", Name: "general", Type: "channel"},
+	})
+	m.SetReadStateReader(func() map[string]cache.ReadState {
+		return map[string]cache.ReadState{"C1": {HasUnread: true, MentionCount: 3}}
+	})
+	m.ToggleCollapse("Channels")
+	plain := func(row string) string { return ansiRe.ReplaceAllString(row, "") }
+
+	if got := plain(rowFor(t, m.View(10, 30), "deploys")); !strings.Contains(got, "# deploys  3 ") {
+		t.Errorf("want the badge right after the name with the option off, got %q", got)
+	}
+	m.SetRightAlignBadges(true)
+	got := plain(rowFor(t, m.View(10, 30), "deploys"))
+	if len([]rune(got)) != 28 || !strings.HasSuffix(got, " 3   ") {
+		t.Errorf("want the badge at the row's end (one spare cell, then padding), got %q", got)
 	}
 }

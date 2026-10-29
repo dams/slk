@@ -48,6 +48,10 @@ var (
 	// nil keeps the "▌" cursor marker.
 	SidebarSelectedBg color.Color
 	SidebarSelectedFg color.Color
+	// MentionBadgeBg/Fg are nil unless the theme sets mention_badge_*;
+	// the badge then uses the selection pair.
+	MentionBadgeBg color.Color
+	MentionBadgeFg color.Color
 
 	// Panel styles
 	FocusedBorder = lipgloss.NewStyle().
@@ -383,6 +387,13 @@ func Apply(themeName string, overrides core.Theme) {
 		UsernameColor = Primary
 	}
 	SidebarSelectedBg, SidebarSelectedFg = nil, nil
+	MentionBadgeBg, MentionBadgeFg = nil, nil
+	if colors.MentionBadgeBg != "" {
+		MentionBadgeBg = lipgloss.Color(colors.MentionBadgeBg)
+	}
+	if colors.MentionBadgeFg != "" {
+		MentionBadgeFg = lipgloss.Color(colors.MentionBadgeFg)
+	}
 	if colors.SidebarSelectedBg != "" {
 		SidebarSelectedBg = lipgloss.Color(colors.SidebarSelectedBg)
 		SidebarSelectedFg = SidebarText
@@ -557,10 +568,24 @@ func SelectionStyle() lipgloss.Style {
 // belongs to the status bar. See
 // docs/superpowers/specs/2026-09-09-mention-badges-design.md.
 func MentionBadgeStyle() lipgloss.Style {
+	bg, fg := mentionBadgeColors()
 	return lipgloss.NewStyle().
-		Background(SelectionBackground).
-		Foreground(SelectionForeground).
+		Background(bg).
+		Foreground(fg).
 		Padding(0, 1)
+}
+
+// mentionBadgeColors is the theme's mention_badge_bg/fg, each falling
+// back to its selection counterpart.
+func mentionBadgeColors() (bg, fg color.Color) {
+	bg, fg = SelectionBackground, SelectionForeground
+	if MentionBadgeBg != nil {
+		bg = MentionBadgeBg
+	}
+	if MentionBadgeFg != nil {
+		fg = MentionBadgeFg
+	}
+	return bg, fg
 }
 
 // mutedMentionBadgeAlpha is how much of the normal badge's background
@@ -592,7 +617,7 @@ func MutedMentionBadgeStyle() lipgloss.Style {
 	// the state at process start before a theme is loaded. Degrade to
 	// the undimmed background rather than panicking; there is nothing
 	// to mix toward yet.
-	bg := SelectionBackground
+	bg, _ := mentionBadgeColors()
 	if bg != nil && SidebarBackground != nil {
 		bg = mixColors(bg, SidebarBackground, mutedMentionBadgeAlpha)
 	}

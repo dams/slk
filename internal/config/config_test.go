@@ -900,6 +900,25 @@ func TestEffectiveUseSlackSections_UnknownTeamUsesGlobal(t *testing.T) {
 	}
 }
 
+func TestConfig_RightAlignBadges(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	for _, tc := range []struct {
+		toml string
+		want bool
+	}{{"", false}, {"[sidebar]\nright_align_badges = true\n", true}} {
+		if err := os.WriteFile(path, []byte(tc.toml), 0644); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := Load(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.Sidebar.RightAlignBadges != tc.want {
+			t.Errorf("%q: right_align_badges = %v, want %v", tc.toml, cfg.Sidebar.RightAlignBadges, tc.want)
+		}
+	}
+}
+
 func TestMatchSectionAndOrder_ExplicitOrder(t *testing.T) {
 	c := Config{
 		Sections: map[string]SectionDef{

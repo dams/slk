@@ -403,6 +403,7 @@ type styleGlobals struct {
 	sidebarBg, sidebarText, sidebarTextMuted    color.Color
 	selectionBg, selectionFg                    color.Color
 	sidebarSelectedBg, sidebarSelectedFg        color.Color
+	mentionBadgeBg, mentionBadgeFg              color.Color
 	chSelected, chNormal, chUnread, chMuted     lipgloss.Style
 	sectionHeader, presenceOnline, presenceAway lipgloss.Style
 }
@@ -417,6 +418,8 @@ func snapshotStyleGlobals() styleGlobals {
 		selectionFg:       styles.SelectionForeground,
 		sidebarSelectedBg: styles.SidebarSelectedBg,
 		sidebarSelectedFg: styles.SidebarSelectedFg,
+		mentionBadgeBg:    styles.MentionBadgeBg,
+		mentionBadgeFg:    styles.MentionBadgeFg,
 		chSelected:        styles.ChannelSelected, chNormal: styles.ChannelNormal,
 		chUnread: styles.ChannelUnread, chMuted: styles.ChannelMuted,
 		sectionHeader:  styles.SectionHeader,
@@ -443,6 +446,7 @@ func (g styleGlobals) restore() {
 	styles.SidebarTextMuted = g.sidebarTextMuted
 	styles.SelectionBackground, styles.SelectionForeground = g.selectionBg, g.selectionFg
 	styles.SidebarSelectedBg, styles.SidebarSelectedFg = g.sidebarSelectedBg, g.sidebarSelectedFg
+	styles.MentionBadgeBg, styles.MentionBadgeFg = g.mentionBadgeBg, g.mentionBadgeFg
 	styles.ChannelSelected, styles.ChannelNormal = g.chSelected, g.chNormal
 	styles.ChannelUnread, styles.ChannelMuted = g.chUnread, g.chMuted
 	styles.SectionHeader = g.sectionHeader
