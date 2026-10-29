@@ -1630,6 +1630,10 @@ func (m *Model) buildCache(width int) {
 
 	cursorSelected := cursorStyle.Render("▌")
 	activeBorder := activeBorderStyle.Render("▌")
+	pillAttrs := messages.SidebarSelectedANSI()
+	if pillAttrs != "" {
+		pillAttrs += "\x1b[1m"
+	}
 	unreadDotStr := dotStyle.Render("●")
 	privatePrefix := privateStyle.Render("◆ ")
 	// Read private channels use a *plain* "◆ " glyph (no inline ANSI
@@ -1676,6 +1680,7 @@ func (m *Model) buildCache(width int) {
 	if m.threadsUnread > 0 {
 		threadsAttrs += "\x1b[1m"
 	}
+	threadsPill := threadsLabel
 	threadsLabel = messages.ReapplyBgAfterResets(threadsLabel, threadsAttrs)
 	threadsCursor = messages.ReapplyBgAfterResets(threadsCursor, threadsAttrs)
 	threadsActiveLabel = messages.ReapplyBgAfterResets(threadsActiveLabel, threadsAttrs)
@@ -1685,6 +1690,9 @@ func (m *Model) buildCache(width int) {
 	}
 	threadsNormal := threadsBaseStyle.Width(width - 2).Render(threadsLabel)
 	threadsSelectedRow := styles.ChannelSelected.Width(width - 2).Render(threadsCursor)
+	if pillAttrs != "" {
+		threadsSelectedRow = pillRow(threadsPill, width, pillAttrs)
+	}
 	threadsActiveRow := styles.ChannelSelected.Width(width - 2).Render(threadsActiveLabel)
 	m.cacheRows = append(m.cacheRows, renderRow{
 		normal:       threadsNormal,
@@ -1711,6 +1719,7 @@ func (m *Model) buildCache(width int) {
 	if m.activityUnread > 0 {
 		activityAttrs += "\x1b[1m"
 	}
+	activityPill := activityLabel
 	activityLabel = messages.ReapplyBgAfterResets(activityLabel, activityAttrs)
 	activityCursor = messages.ReapplyBgAfterResets(activityCursor, activityAttrs)
 	activityActiveLabel = messages.ReapplyBgAfterResets(activityActiveLabel, activityAttrs)
@@ -1720,6 +1729,9 @@ func (m *Model) buildCache(width int) {
 	}
 	activityNormal := activityBaseStyle.Width(width - 2).Render(activityLabel)
 	activitySelectedRow := styles.ChannelSelected.Width(width - 2).Render(activityCursor)
+	if pillAttrs != "" {
+		activitySelectedRow = pillRow(activityPill, width, pillAttrs)
+	}
 	activityActiveRow := styles.ChannelSelected.Width(width - 2).Render(activityActiveLabel)
 	m.cacheRows = append(m.cacheRows, renderRow{
 		normal:        activityNormal,
@@ -1931,6 +1943,9 @@ func (m *Model) buildCache(width int) {
 
 		rowNormal := baseStyle.Width(width - 2).Render(labelNormal)
 		rowSelected := styles.ChannelSelected.Width(width - 2).Render(labelSelected)
+		if pillAttrs != "" {
+			rowSelected = pillRow(" "+prefix+name+" "+unreadDot, width, pillAttrs)
+		}
 		// Active uses the same bright/bold treatment as Selected so the
 		// entered channel reads as "current" even when its unread count
 		// is zero (which is the common case after MarkChannel runs).
@@ -2087,6 +2102,17 @@ func (m *Model) renderSectionHeaderLabel(name, cursor string, dotStyle lipgloss.
 	selected := cursor + glyph + " " + emojiPrefix + displayName + aggregates
 	return messages.ReapplyBgAfterResets(label, bgAnsi),
 		messages.ReapplyBgAfterResets(selected, bgAnsi)
+}
+
+// pillRow renders a cursor row as the theme's sidebar_selected_bg pill,
+// inset one column from each edge so its text lines up with the other
+// rows. label starts with the cursor slot; attrs is re-applied after
+// every ANSI reset inside it.
+func pillRow(label string, width int, attrs string) string {
+	edge := lipgloss.NewStyle().Background(styles.SidebarBackground).Render(" ")
+	pill := lipgloss.NewStyle().Background(styles.SidebarSelectedBg).
+		Foreground(styles.SidebarSelectedFg).Bold(true).Width(width - 4)
+	return edge + pill.Render(messages.ReapplyBgAfterResets(label, attrs)) + edge
 }
 
 func (m *Model) View(height, width int) string {
