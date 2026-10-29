@@ -63,6 +63,7 @@ quiet_hours = "22:00-08:00"   # planned
 
 [sidebar]
 right_align_badges = false  # true: mention badges at the right end of the row (Slack)
+channel_indent = 0          # cells to indent the rows under each section header (0-6)
 
 [compose]
 editor = "nvim"   # Ctrl+E editor, used when $VISUAL and $EDITOR are unset

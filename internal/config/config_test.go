@@ -912,6 +912,20 @@ func TestConfig_RightAlignBadges(t *testing.T) {
 	}
 }
 
+func TestConfig_ChannelIndent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[sidebar]\nchannel_indent = 3\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Sidebar.ChannelIndent != 3 {
+		t.Errorf("channel_indent = %d, want 3", cfg.Sidebar.ChannelIndent)
+	}
+}
+
 func TestMatchSectionAndOrder_ExplicitOrder(t *testing.T) {
 	c := Config{
 		Sections: map[string]SectionDef{

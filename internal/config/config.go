@@ -170,6 +170,9 @@ type Sidebar struct {
 	// rows, as Slack does. Default off.
 	RightAlignBadges bool `toml:"right_align_badges"`
 	Width            int  `toml:"width"`
+	// ChannelIndent indents the rows under each section header by this
+	// many cells, as Slack does (0-6). Default 0.
+	ChannelIndent int `toml:"channel_indent"`
 }
 
 // Marks holds preferences for vim-style marks.

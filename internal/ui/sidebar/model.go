@@ -291,6 +291,9 @@ type Model struct {
 	// rightAlignBadges puts mention badges at the row's right end
 	// ([sidebar] right_align_badges).
 	rightAlignBadges bool
+	// channelIndent shifts rows under a section header right by that
+	// many cells ([sidebar] channel_indent).
+	channelIndent int
 
 	// Staleness filter: items whose last_read_ts (from the read-state
 	// DB, fetched via readStateReader in rebuildFilter) is older than
@@ -608,6 +611,18 @@ func (m *Model) SetRightAlignBadges(enabled bool) {
 	m.cacheValid = false
 	m.dirty()
 }
+
+// SetChannelIndent indents the rows under each section header by n
+// cells, clamped to [0, maxChannelIndent].
+func (m *Model) SetChannelIndent(n int) {
+	m.channelIndent = min(max(n, 0), maxChannelIndent)
+	m.cacheValid = false
+	m.dirty()
+}
+
+// maxChannelIndent keeps an indented name readable in the narrowest
+// sidebar.
+const maxChannelIndent = 6
 
 // SetActiveChannelID names the channel currently shown in the message
 // pane. The active channel is always exempt from staleness hiding so
@@ -1862,6 +1877,7 @@ func (m *Model) buildCache(width int) {
 		default:
 			prefix = "# "
 		}
+		prefix = strings.Repeat(" ", m.channelIndent) + prefix
 
 		// Truncate name to fit sidebar width.
 		// Unicode chars like ● (U+25CF), ○, ◆, ▌ have East Asian Width
@@ -1886,7 +1902,7 @@ func (m *Model) buildCache(width int) {
 		if statusGlyph != "" {
 			statusCells = 1 + item.Status.GlyphWidth(statusNow)
 		}
-		maxNameLen := (width - 2) - rowChromeExcludingTrailer - trailerCells - statusCells
+		maxNameLen := (width - 2) - rowChromeExcludingTrailer - trailerCells - statusCells - m.channelIndent
 		if maxNameLen < 5 {
 			maxNameLen = 5
 		}

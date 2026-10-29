@@ -3478,6 +3478,12 @@ func (a *App) SetRightAlignBadges(enabled bool) {
 	a.sidebar.SetRightAlignBadges(enabled)
 }
 
+// SetChannelIndent indents the sidebar rows under each section header
+// ([sidebar] channel_indent).
+func (a *App) SetChannelIndent(n int) {
+	a.sidebar.SetChannelIndent(n)
+}
+
 // renderTypingLine returns the styled typing indicator for the current
 // channel (people typing, apps working), or an empty string if there is
 // neither. Stays on App because it pulls in messagepane name resolution

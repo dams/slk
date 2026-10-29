@@ -19,6 +19,7 @@ type uiSettings struct {
 	TypingIndicators bool
 	StaleAfter       time.Duration
 	RightAlignBadges bool
+	ChannelIndent    int
 	MouseWheelLines  int
 	ColoredUsernames bool
 	ThemeOverrides   core.Theme
@@ -34,6 +35,7 @@ func uiSettingsFromConfig(cfg config.Config) uiSettings {
 		TypingIndicators:      cfg.Animations.TypingIndicators,
 		StaleAfter:            time.Duration(cfg.Sidebar.HideInactiveAfterDays) * 24 * time.Hour,
 		RightAlignBadges:      cfg.Sidebar.RightAlignBadges,
+		ChannelIndent:         cfg.Sidebar.ChannelIndent,
 		MouseWheelLines:       cfg.Appearance.MouseWheelLines,
 		ColoredUsernames:      cfg.Appearance.ColoredUsernames,
 		ThemeOverrides:        cfg.Theme,
@@ -53,6 +55,7 @@ func applyUISettings(app *ui.App, s uiSettings) {
 	})
 	app.SetTypingEnabled(s.TypingIndicators)
 	app.SetRightAlignBadges(s.RightAlignBadges)
+	app.SetChannelIndent(s.ChannelIndent)
 	app.SetSidebarStaleThreshold(s.StaleAfter)
 	app.SetMouseWheelLines(s.MouseWheelLines)
 	app.SetColoredUsernames(s.ColoredUsernames)
