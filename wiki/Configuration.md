@@ -251,6 +251,11 @@ sidebar_background = "#19171D"
 sidebar_text       = "#D1D2D3"
 sidebar_text_muted = "#9A9B9E"
 rail_background    = "#19171D"
+
+# Optional, for a Slack-like look. Unset keeps slk's defaults.
+username            = "#1D1C1D" # author names (default: primary)
+sidebar_selected_bg = "#333133" # selected sidebar row as a filled pill, no ▌
+sidebar_selected_fg = "#F8F8F8" # its text (default: sidebar_text)
 ```
 
 Every built-in theme now sets a channels-panel (sidebar) background that is
