@@ -2265,9 +2265,10 @@ func (m *Model) View(height, width int) string {
 // mentionPill is Slack's "Unread mentions" pill, centred on a sidebar row,
 // pointing at a mentioned channel scrolled out of view.
 func mentionPill(arrow string, width int) string {
-	pill := styles.UnreadBadge.Bold(true).Render(arrow + " Unread mentions")
+	badge := styles.MentionBadgeStyle().Bold(true)
+	pill := badge.Render(arrow + " Unread mentions")
 	if lipgloss.Width(pill) > width-2 {
-		pill = styles.UnreadBadge.Bold(true).Render(arrow + " Mentions")
+		pill = badge.Render(arrow + " Mentions")
 	}
 	return lipgloss.PlaceHorizontal(width-2, lipgloss.Center, pill,
 		lipgloss.WithWhitespaceStyle(lipgloss.NewStyle().Background(styles.SidebarBackground)))

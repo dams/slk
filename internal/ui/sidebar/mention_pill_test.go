@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gammons/slk/internal/cache"
+	"github.com/gammons/slk/internal/ui/styles"
 )
 
 func mentionPillFixture() *Model {
@@ -44,6 +45,17 @@ func TestMentionPill_PointsAtScrolledAwayMentions(t *testing.T) {
 	}
 	if strings.Contains(view, "↓ Unread mentions") {
 		t.Errorf("↓ pill still shown with the mention in view:\n%s", view)
+	}
+}
+
+func TestMentionPill_UsesTheMentionBadgeStyle(t *testing.T) {
+	m := mentionPillFixture()
+	m.SelectByID("C10")
+	m.View(8, 30)
+	m.MoveUp()
+	top := strings.Split(m.View(8, 30), "\n")[0]
+	if want := styles.MentionBadgeStyle().Bold(true).Render("↑ Unread mentions"); !strings.Contains(top, want) {
+		t.Errorf("pill not drawn in the mention badge style:\n%q\nwant it to contain\n%q", top, want)
 	}
 }
 
