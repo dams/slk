@@ -926,6 +926,22 @@ func TestConfig_ChannelIndent(t *testing.T) {
 	}
 }
 
+func TestConfig_SidebarSlackOptions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	body := "[sidebar]\nslack_style = true\nprivate_glyph = \"L\"\nactive_only = true\nmouse_resize = true\n"
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := cfg.Sidebar
+	if !s.SlackStyle || s.PrivateGlyph != "L" || !s.ActiveOnly || !s.MouseResize {
+		t.Errorf("parsed %+v", s)
+	}
+}
+
 func TestMatchSectionAndOrder_ExplicitOrder(t *testing.T) {
 	c := Config{
 		Sections: map[string]SectionDef{

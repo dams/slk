@@ -20,12 +20,23 @@ type uiSettings struct {
 	StaleAfter       time.Duration
 	RightAlignBadges bool
 	ChannelIndent    int
+	SidebarStyle     ui.SidebarStyle
 	MouseWheelLines  int
 	ColoredUsernames bool
 	ThemeOverrides   core.Theme
 	// StayInInsertAfterSend is [compose] stay_in_insert_after_send
 	// (default off).
 	StayInInsertAfterSend bool
+}
+
+// sidebarStyleFromConfig is the [sidebar] look and behaviour switches.
+func sidebarStyleFromConfig(s config.Sidebar) ui.SidebarStyle {
+	return ui.SidebarStyle{
+		Slack:        s.SlackStyle,
+		PrivateGlyph: s.PrivateGlyph,
+		ActiveOnly:   s.ActiveOnly,
+		MouseResize:  s.MouseResize,
+	}
 }
 
 // uiSettingsFromConfig is run()'s uiSettings, read from the loaded config.
@@ -36,6 +47,7 @@ func uiSettingsFromConfig(cfg config.Config) uiSettings {
 		StaleAfter:            time.Duration(cfg.Sidebar.HideInactiveAfterDays) * 24 * time.Hour,
 		RightAlignBadges:      cfg.Sidebar.RightAlignBadges,
 		ChannelIndent:         cfg.Sidebar.ChannelIndent,
+		SidebarStyle:          sidebarStyleFromConfig(cfg.Sidebar),
 		MouseWheelLines:       cfg.Appearance.MouseWheelLines,
 		ColoredUsernames:      cfg.Appearance.ColoredUsernames,
 		ThemeOverrides:        cfg.Theme,
@@ -56,6 +68,7 @@ func applyUISettings(app *ui.App, s uiSettings) {
 	app.SetTypingEnabled(s.TypingIndicators)
 	app.SetRightAlignBadges(s.RightAlignBadges)
 	app.SetChannelIndent(s.ChannelIndent)
+	app.SetSidebarStyle(s.SidebarStyle)
 	app.SetSidebarStaleThreshold(s.StaleAfter)
 	app.SetMouseWheelLines(s.MouseWheelLines)
 	app.SetColoredUsernames(s.ColoredUsernames)

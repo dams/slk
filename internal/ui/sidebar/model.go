@@ -294,6 +294,15 @@ type Model struct {
 	// channelIndent shifts rows under a section header right by that
 	// many cells ([sidebar] channel_indent).
 	channelIndent int
+	// slackStyle draws headers and rows as Slack does and sorts names
+	// ignoring punctuation ([sidebar] slack_style).
+	slackStyle bool
+	// privateGlyph replaces "◆" before private channels when set
+	// ([sidebar] private_glyph).
+	privateGlyph string
+	// activeOnly hides conversations inactive for activeOnlyWindow in
+	// every section, like Slack's "Active only" ([sidebar] active_only).
+	activeOnly bool
 
 	// Staleness filter: items whose last_read_ts (from the read-state
 	// DB, fetched via readStateReader in rebuildFilter) is older than
@@ -623,6 +632,39 @@ func (m *Model) SetChannelIndent(n int) {
 // maxChannelIndent keeps an indented name readable in the narrowest
 // sidebar.
 const maxChannelIndent = 6
+
+// SetSlackStyle turns on Slack's sidebar look: no "▾" on expanded
+// headers, regular-weight headers, no unread dot (bold is enough), and
+// names sorted ignoring punctuation.
+func (m *Model) SetSlackStyle(enabled bool) {
+	m.slackStyle = enabled
+	m.refilter()
+}
+
+// SetPrivateGlyph sets the glyph drawn before private channels; ""
+// keeps "◆".
+func (m *Model) SetPrivateGlyph(glyph string) {
+	m.privateGlyph = glyph
+	m.cacheValid = false
+	m.dirty()
+}
+
+// SetActiveOnly hides conversations with no activity in
+// activeOnlyWindow, whatever their section, as Slack's "Active only"
+// sidebar filter does.
+func (m *Model) SetActiveOnly(enabled bool) {
+	m.activeOnly = enabled
+	m.refilter()
+}
+
+// refilter re-runs the filter and sort, keeping the cursor on its row.
+func (m *Model) refilter() {
+	key, hadKey := m.currentCursorKey()
+	m.rebuildFilter()
+	m.rebuildNavWithCursor(key, hadKey)
+	m.cacheValid = false
+	m.dirty()
+}
 
 // SetActiveChannelID names the channel currently shown in the message
 // pane. The active channel is always exempt from staleness hiding so
@@ -1339,6 +1381,9 @@ func (m *Model) rebuildFilter() {
 		if item.ID != m.activeID && IsStale(item, state.HasUnread, state.LastReadTS, m.staleThreshold, now) {
 			continue
 		}
+		if item.ID != m.activeID && m.activeOnly && isInactive(item, state, now) {
+			continue
+		}
 		m.filtered = append(m.filtered, i)
 	}
 
@@ -1388,7 +1433,13 @@ func (m *Model) rebuildFilter() {
 		if oa != ob {
 			return oa < ob
 		}
-		return text.Fold(m.items[ia].Name) < text.Fold(m.items[ib].Name)
+		na, nb := text.Fold(m.items[ia].Name), text.Fold(m.items[ib].Name)
+		if m.slackStyle {
+			if ka, kb := slackSortKey(na), slackSortKey(nb); ka != kb {
+				return ka < kb
+			}
+		}
+		return na < nb
 	})
 }
 
@@ -1661,7 +1712,11 @@ func (m *Model) buildCache(width int) {
 		pillAttrs += "\x1b[1m"
 	}
 	unreadDotStr := dotStyle.Render("●")
-	privatePrefix := privateStyle.Render("◆ ")
+	privateGlyph := "◆"
+	if m.privateGlyph != "" {
+		privateGlyph = m.privateGlyph
+	}
+	privatePrefix := privateStyle.Render(privateGlyph + " ")
 	// Read private channels use a *plain* "◆ " glyph (no inline ANSI
 	// styling) so the prefix inherits the surrounding row style the
 	// same way the public-channel "# " does. Inline-styled prefixes
@@ -1669,7 +1724,10 @@ func (m *Model) buildCache(width int) {
 	// brighter SidebarFgANSI for everything after the reset, which
 	// overrides ChannelNormal's TextMuted foreground and made read
 	// private rows appear lighter than read public rows.
-	privatePrefixMuted := "◆ "
+	privatePrefixMuted := privateGlyph + " "
+	if m.slackStyle {
+		privatePrefix = privatePrefixMuted
+	}
 	dmActivePrefix := styles.PresenceOnline.Render("● ")
 	dmAwayPrefix := styles.PresenceAway.Render("○ ")
 	// DND replaces the presence dot, like Slack's badge on the avatar.
@@ -1843,7 +1901,7 @@ func (m *Model) buildCache(width int) {
 			// Charging a 1-digit badge the 3-digit worst case would
 			// truncate a name by two columns for nothing.
 			trailerCells = len(badgeText) + 2
-		} else if hasUnread {
+		} else if hasUnread && !m.slackStyle {
 			unreadDot = unreadDotStr
 		}
 
@@ -2013,6 +2071,10 @@ func (m *Model) buildCache(width int) {
 
 	// Flatten into a single row list with section headers.
 	// Add a blank line between sections for visual separation.
+	headerStyle := styles.SectionHeader
+	if m.slackStyle {
+		headerStyle = headerStyle.Bold(false)
+	}
 	for i, name := range sectionOrder {
 		if i > 0 {
 			m.cacheRows = append(m.cacheRows, renderRow{height: 1, navIdx: -1})
@@ -2024,8 +2086,8 @@ func (m *Model) buildCache(width int) {
 			ni = -1
 		}
 		m.cacheRows = append(m.cacheRows, renderRow{
-			normal:   styles.SectionHeader.Width(width - 2).Render(headerLabel),
-			selected: styles.SectionHeader.Width(width - 2).Render(headerLabelSelected),
+			normal:   headerStyle.Width(width - 2).Render(headerLabel),
+			selected: headerStyle.Width(width - 2).Render(headerLabelSelected),
 			height:   1,
 			navIdx:   ni,
 		})
@@ -2101,6 +2163,9 @@ func (m *Model) renderSectionHeaderLabel(name, cursor string, dotStyle lipgloss.
 	}
 
 	glyph := "▾" // expanded
+	if m.slackStyle {
+		glyph = " "
+	}
 	if m.IsCollapsed(name) {
 		glyph = "▸"
 	}
