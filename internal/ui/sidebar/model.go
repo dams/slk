@@ -480,14 +480,13 @@ func (m *Model) NextUnread(afterID string, dir int) (id, name, chType string, ok
 
 // Invalidate forces the next View() call to re-read read state from
 // the installed reader. Called by App.Update on ReadStateChangedMsg.
-// With active_only on it also refilters, so a dormant channel that gets
-// a new message comes back.
 func (m *Model) Invalidate() {
+	m.cacheValid = false
+	m.dirty()
+	// active_only: a dormant channel that gets a new message comes back.
 	if m.activeOnly {
 		m.refilter()
 	}
-	m.cacheValid = false
-	m.dirty()
 }
 
 // useSlackSections reports whether Slack-mode rendering is active.
