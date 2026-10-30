@@ -1964,10 +1964,11 @@ func (m *Model) buildCache(width int) {
 		if statusGlyph != "" {
 			statusCells = 1 + item.Status.GlyphWidth(statusNow)
 		}
-		// The indent and a prefix wider than its 3 cells (a custom
-		// private_glyph) come out of the name's budget, and the indent
-		// shrinks first so the 5-cell floor never overflows the row.
-		budget := (width - 2) - rowChromeExcludingTrailer - trailerCells - statusCells - max(lipgloss.Width(prefix)-3, 0)
+		// The indent and a prefix wider than the default 2 cells (a custom
+		// private_glyph) come out of the name's budget, so the prefix's
+		// 3-cell charge keeps its ambiguous-width hedge; the indent shrinks
+		// first so the 5-cell floor never overflows the row.
+		budget := (width - 2) - rowChromeExcludingTrailer - trailerCells - statusCells - max(lipgloss.Width(prefix)-2, 0)
 		indent := min(m.channelIndent, max(budget-5, 0))
 		prefix = strings.Repeat(" ", indent) + prefix
 		maxNameLen := max(budget-indent, 5)

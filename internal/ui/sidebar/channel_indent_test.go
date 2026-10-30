@@ -56,20 +56,27 @@ func TestChannelIndent_NarrowRowStaysOneRow(t *testing.T) {
 	m.ToggleCollapse("Channels")
 	m.SetChannelIndent(6)
 	row := ansiRe.ReplaceAllString(rowFor(t, m.View(12, 20), "a_ra"), "")
-	if !strings.Contains(row, "99+") || lipgloss.Width(row) > 20 {
+	if !strings.HasSuffix(row, "99+  ") || lipgloss.Width(row) > 20 {
 		t.Errorf("row wrapped or overflowed 20 cells (%d): %q", lipgloss.Width(row), row)
 	}
 }
 
+// TestPrivateGlyph_WideGlyphStaysInTheRow: a glyph wider than the
+// default's 2 cells is charged to the name. An overflow by one cell
+// doesn't always wrap: lipgloss may eat the row's right padding instead,
+// so the row must still end with the badge and that padding.
 func TestPrivateGlyph_WideGlyphStaysInTheRow(t *testing.T) {
-	m := New([]ChannelItem{{ID: "G1", Name: "a_rather_long_private_name", Type: "private"}})
-	m.SetReadStateReader(func() map[string]cache.ReadState {
-		return map[string]cache.ReadState{"G1": {HasUnread: true, MentionCount: 120}}
-	})
-	m.ToggleCollapse("Channels")
-	m.SetPrivateGlyph("[priv]")
-	row := ansiRe.ReplaceAllString(rowFor(t, m.View(12, 30), "[priv]"), "")
-	if !strings.Contains(row, "99+") || lipgloss.Width(row) > 30 {
-		t.Errorf("wide private glyph pushed the row past 30 cells (%d): %q", lipgloss.Width(row), row)
+	for _, glyph := range []string{"[priv]", "🔒"} {
+		m := New([]ChannelItem{{ID: "G1", Name: "a_rather_long_private_name", Type: "private"}})
+		m.SetReadStateReader(func() map[string]cache.ReadState {
+			return map[string]cache.ReadState{"G1": {HasUnread: true, MentionCount: 120}}
+		})
+		m.ToggleCollapse("Channels")
+		m.SetPrivateGlyph(glyph)
+		view := m.View(12, 30)
+		row := ansiRe.ReplaceAllString(rowFor(t, view, glyph), "")
+		if !strings.HasSuffix(row, "99+  ") || lipgloss.Width(row) > 30 || strings.Count(view, "\n") != 11 {
+			t.Errorf("%q: row overflowed (width %d, want the badge then its padding): %q", glyph, lipgloss.Width(row), row)
+		}
 	}
 }

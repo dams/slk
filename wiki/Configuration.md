@@ -67,6 +67,7 @@ channel_indent = 0          # cells to indent the rows under each section header
 slack_style = false         # true: Slack's look: no ▾ on open sections, plain headers,
                             # no unread dot (bold only), names sorted ignoring punctuation
 private_glyph = "◆"         # glyph before private channels, e.g. a lock your font has
+                            # (sidebar only: the finder and pane header keep ◆)
 active_only = false         # true: hide conversations with no activity in 30 days, in
                             # every section (Slack's "Active only"; unread ones stay)
 mouse_resize = false        # true: drag the sidebar's right border to resize it

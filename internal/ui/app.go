@@ -616,8 +616,9 @@ type App struct {
 	navHistory *navHistoryStore
 
 	// sidebarMouseResize enables dragging the sidebar's right border;
-	// resizingSidebar is set while such a drag is in progress.
-	sidebarMouseResize, resizingSidebar bool
+	// sidebarResizeFrom is the width a drag started at, 0 when none is on.
+	sidebarMouseResize bool
+	sidebarResizeFrom  int
 
 	// settings persists the theme choice and sidebar width. Nil until wired.
 	settings       core.SettingsService
